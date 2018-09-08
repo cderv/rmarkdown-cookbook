@@ -1,0 +1,61 @@
+---
+title: "Dashboard question"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(polite)
+library(rvest)
+library(purrr)
+```
+
+# Get Top 500 SO questions
+
+## scrape website
+```{r}
+# we want to retrieve the 500 top question
+so_url <- "https://stackoverflow.com/questions/tagged/r-markdown"
+session <- bow(so_url)
+top <- 500
+result_per_page <- 50
+nb_page <- ceiling(top / 50)
+# nb_page <- 1
+res <- seq_len(nb_page) %>%
+  map(~ scrape(session, 
+               params = glue::glue("pages={page_nb}&sort=votes&pagesize={result_per_page}", 
+                                   page_nb = .x), verbose = TRUE
+  ))
+
+```
+
+
+## get question url
+```{r, eval = FALSE}
+QA_urls <- res %>%
+  map(~html_nodes(.x, "h3 >a.question-hyperlink") %>%
+        html_attr("href") %>%
+        map_chr(~ modify_url(so_url, path = .x))) %>%
+  flatten_chr()
+
+rds_topQA <- here::here("dashboard/TOP_QA_SO.rds")
+saveRDS(QA_urls, rds_topQA)
+
+QA_urls <- readRDS(rds_topQA)
+
+so_top_qa <- tibble(urls = QA_urls) %>%
+  mutate(
+    top = row_number(),
+    id = str_extract(urls, "(?<=/)\\d{8}(?=/)") 
+  )
+```
+
+## store in googlesheet
+
+create the initial data
+```{r, eval = FALSE}
+library(googlesheets)
+gs_new("rmarkdown-cookbook", ws_title = "QA_SO", input = so_top_qa)
+```
+
