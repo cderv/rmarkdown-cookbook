@@ -24,7 +24,7 @@ nb_page <- ceiling(top / 50)
 # nb_page <- 1
 res <- seq_len(nb_page) %>%
   map(~ scrape(session, 
-               params = glue::glue("pages={page_nb}&sort=votes&pagesize={result_per_page}", 
+               params = glue::glue("page={page_nb}&sort=votes&pagesize={result_per_page}", 
                                    page_nb = .x), verbose = TRUE
   ))
 
@@ -36,25 +36,16 @@ res <- seq_len(nb_page) %>%
 so_top_qa <- res %>%
   map(~html_nodes(.x, "h3 >a.question-hyperlink") %>%
         html_attr("href") %>%
-        map_chr(~ modify_url(so_url, path = .x))) %>%
+        map_chr(~ httr::modify_url(so_url, path = .x))) %>%
   flatten_chr() %>%
   tibble(urls = .) %>%
   mutate(
     top = row_number(),
     id = str_extract(urls, "(?<=/)\\d{8}(?=/)") 
   )
-
-rds_topQA <- here::here("dashboard/TOP_QA_SO.rds")
-saveRDS(so_top_qa, rds_topQA)
+readr::write_csv(so_top_qa, here::here("dashboard/TOP500_QA_SO.csv"))
 ```
 
-## store in googlesheet
-
-create the initial data
-```{r, eval = FALSE}
-library(googlesheets)
-gs_new("rmarkdown-cookbook", ws_title = "QA_SO", input = so_top_qa)
-```
 
 # Find QA already looked at on GH
 
@@ -85,6 +76,14 @@ so_in_gh <- get_all_thread %>%
   select(issue, so_url_gh = so_url, id) %>%
   distinct()
 so_in_gh
+```
+
+# summary of already dealt issues
+
+```{r}
+top_QA <- read_csv(here::here("dashboard", "TOP500_QA_SO.csv"), col_types = "cic")
+full_table <- so_in_gh %>%
+  full_join(top_QA, by = "id")
 ```
 
 
