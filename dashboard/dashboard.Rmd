@@ -1,20 +1,21 @@
 ---
-title: "Dashboard question"
-output: html_document
+title: "Dashboard for SO question in Rmarkdown Cookbook"
+output: 
+  flexdashboard::flex_dashboard:
+    self_contained: false 
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(polite)
 library(rvest)
 library(purrr)
 ```
 
+```{r parsing-so, eval = FALSE}
 # Get Top 500 SO questions
-
 ## scrape website
-```{r}
 # we want to retrieve the 500 top question
 so_url <- "https://stackoverflow.com/questions/tagged/r-markdown"
 session <- bow(so_url)
@@ -27,12 +28,10 @@ res <- seq_len(nb_page) %>%
                params = glue::glue("page={page_nb}&sort=votes&pagesize={result_per_page}", 
                                    page_nb = .x), verbose = TRUE
   ))
-
 ```
 
-
+```{r get-so-qa-url, eval = FALSE}
 ## get question url
-```{r, eval = FALSE}
 so_top_qa <- res %>%
   map(~html_nodes(.x, "h3 >a.question-hyperlink") %>%
         html_attr("href") %>%
@@ -43,16 +42,12 @@ so_top_qa <- res %>%
     top = row_number(),
     id = str_extract(urls, "(?<=/)\\d{8}(?=/)") 
   )
-readr::write_csv(so_top_qa, here::here("dashboard/TOP500_QA_SO.csv"))
+readr::write_csv("TOP500_QA_SO.csv")
 ```
 
-
+```{r get-so-in-gh, eval = FALSE}
 # Find QA already looked at on GH
-
-Use github graphQL API
-
-
-```{r}
+# Use github graphQL API
 library(ghrecipes)
 owner <- "mikey-harper"
 repo <- "rmarkdown-cookbook"
@@ -75,15 +70,72 @@ so_in_gh <- get_all_thread %>%
          id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
   select(issue, so_url_gh = so_url, id) %>%
   distinct()
-so_in_gh
+saveRDS(so_in_gh, "so_in_gh.rds")
 ```
 
+```{r data-top-500-in-gh}
 # summary of already dealt issues
+top_QA <- read_csv("TOP500_QA_SO.csv", col_types = "cic")
+so_in_gh <- readRDS("so_in_gh.rds")
+full_table <- so_in_gh %>%
+  full_join(top_QA, by = "id") %>%
+  select(top, urls, id, issue) %>%
+  arrange(top)
+```
+
+
+Dashboard
+===========================
+
+Column
+----------------------------------------
+
+### SO QA
 
 ```{r}
-top_QA <- read_csv(here::here("dashboard", "TOP500_QA_SO.csv"), col_types = "cic")
-full_table <- so_in_gh %>%
-  full_join(top_QA, by = "id")
+full_table %>%
+  mutate(not_in_gh = if_else(is.na(issue), "not in GH yet", "Already in GH")) %>%
+  ggplot(aes(not_in_gh, fill = not_in_gh)) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(label = stat(count), y = stat(count)), stat = "count", vjust = -0.5, hjust = 0.5) +
+  theme_light() +
+  scale_x_discrete(breaks = NULL) +
+  labs(
+    title = "Nb of SO questions already in GH issues",
+    x = NULL,
+    fill = "Top SO QA"
+  )
 ```
 
+Column
+-------------------------------------------
+
+### Achievement
+
+```{r}
+rate <- full_table %>% count(ok = !is.na(issue)) %>% filter(ok) %>% pull(n)
+flexdashboard::gauge(rate, 0, 500)
+```
+
+### Next Questions
+
+```{r left-questions}
+full_table %>%
+  filter(is.na(issue)) %>%
+  select(top, urls) %>%
+  arrange(top) %>%
+  DT::datatable()
+```
+
+
+Data
+============================
+
+### TOP 500 SO QA
+
+This table contains TOP 500 QA from SO and where they are mentionned in issues
+
+```{r render-full-table}
+DT::datatable(full_table)
+```
 
