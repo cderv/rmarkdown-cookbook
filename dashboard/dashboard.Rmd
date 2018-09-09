@@ -80,7 +80,16 @@ so_in_gh <- readRDS("so_in_gh.rds")
 full_table <- so_in_gh %>%
   full_join(top_QA, by = "id") %>%
   select(top, urls, id, issue) %>%
-  arrange(top)
+  arrange(top) %>%
+  mutate(urls = map_chr(urls, ~htmltools::a(.x, href = .x, target="_blank") %>% as.character),
+         # create link toward issue
+         issue_link = map_chr(
+           issue, 
+           ~htmltools::a(.x,
+                         href = paste0("https://github.com/mikey-harper/rmarkdown-cookbook/issues/", .x),
+                         target="_blank") %>%
+                           as.character()
+         ))
 ```
 
 
@@ -124,7 +133,7 @@ full_table %>%
   filter(is.na(issue)) %>%
   select(top, urls) %>%
   arrange(top) %>%
-  DT::datatable()
+  DT::datatable(escape = FALSE)
 ```
 
 
@@ -136,6 +145,6 @@ Data
 This table contains TOP 500 QA from SO and where they are mentionned in issues
 
 ```{r render-full-table}
-DT::datatable(full_table)
+DT::datatable(full_table %>% select(-issue), escape = FALSE)
 ```
 
