@@ -33,22 +33,19 @@ res <- seq_len(nb_page) %>%
 
 ## get question url
 ```{r, eval = FALSE}
-QA_urls <- res %>%
+so_top_qa <- res %>%
   map(~html_nodes(.x, "h3 >a.question-hyperlink") %>%
         html_attr("href") %>%
         map_chr(~ modify_url(so_url, path = .x))) %>%
-  flatten_chr()
-
-rds_topQA <- here::here("dashboard/TOP_QA_SO.rds")
-saveRDS(QA_urls, rds_topQA)
-
-QA_urls <- readRDS(rds_topQA)
-
-so_top_qa <- tibble(urls = QA_urls) %>%
+  flatten_chr() %>%
+  tibble(urls = .) %>%
   mutate(
     top = row_number(),
     id = str_extract(urls, "(?<=/)\\d{8}(?=/)") 
   )
+
+rds_topQA <- here::here("dashboard/TOP_QA_SO.rds")
+saveRDS(so_top_qa, rds_topQA)
 ```
 
 ## store in googlesheet
@@ -58,4 +55,36 @@ create the initial data
 library(googlesheets)
 gs_new("rmarkdown-cookbook", ws_title = "QA_SO", input = so_top_qa)
 ```
+
+# Find QA already looked at on GH
+
+Use github graphQL API
+
+
+```{r}
+library(ghrecipes)
+owner <- "mikey-harper"
+repo <- "rmarkdown-cookbook"
+ignored_issues <- c(4)
+issues <- get_issue_labels_state(owner, repo)
+get_all_thread <- map_dfr(issues$number, ~ get_issue_thread(owner, repo, .x))
+so_in_gh <- get_all_thread %>%
+  select(issue, body) %>%
+  # do not select some issue
+  filter(issue != 4) %>%
+  # get only issues with stackoverflow url
+  mutate(has_so_url = str_detect(body, "https://stackoverflow.com")) %>%
+  filter(has_so_url) %>%
+  mutate(so_url = str_extract_all(body, "\\bhttps://stackoverflow.com/[^\\s)]*")) %>%
+  unnest(so_url) %>%
+  # deal with comment shared url
+  mutate(so_url = map_if(so_url, 
+                         ~str_detect(.x, "https://stackoverflow.com/a/.*"), 
+                         ~httr::GET(.x)$url) %>% flatten_chr,
+         id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
+  select(issue, so_url_gh = so_url, id) %>%
+  distinct()
+so_in_gh
+```
+
 
