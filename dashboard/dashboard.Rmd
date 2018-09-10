@@ -1,5 +1,5 @@
 ---
-title: "Dashboard for SO question in Rmarkdown Cookbook"
+title: "Dashboard for SO questions in Rmarkdown Cookbook"
 output: 
   flexdashboard::flex_dashboard:
     self_contained: false 
@@ -11,6 +11,9 @@ library(tidyverse)
 library(polite)
 library(rvest)
 library(purrr)
+# control what evaluate or not in dev mode
+is_dev <- as.logical(Sys.getenv("IS_DEV", FALSE))
+message(ifelse(is_dev, "DEV MODE ON", "DEV MODE OFF")) 
 ```
 
 ```{r parsing-so, eval = FALSE}
@@ -45,7 +48,8 @@ so_top_qa <- res %>%
 readr::write_csv("TOP500_QA_SO.csv")
 ```
 
-```{r get-so-in-gh, eval = FALSE}
+```{r get-so-in-gh, eval = !is_dev}
+# REM : NOT RUN IN DEV MODE (if IS_DEV env var is true)
 # Find QA already looked at on GH
 # Use github graphQL API
 library(ghrecipes)
@@ -70,13 +74,23 @@ so_in_gh <- get_all_thread %>%
          id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
   select(issue, so_url_gh = so_url, id) %>%
   distinct()
+```
+
+```{r rds-for-dev, eval = FALSE}
+# saved once for dev purposes
 saveRDS(so_in_gh, "so_in_gh.rds")
 ```
+
+```{r load-dev-table, eval = is_dev}
+# only run if IS_DEV env var is TRUE
+# Purpose : Prevent github api request in dev mode
+so_in_gh <- readRDS("so_in_gh.rds")
+```
+
 
 ```{r data-top-500-in-gh}
 # summary of already dealt issues
 top_QA <- read_csv("TOP500_QA_SO.csv", col_types = "cic")
-so_in_gh <- readRDS("so_in_gh.rds")
 full_table <- so_in_gh %>%
   full_join(top_QA, by = "id") %>%
   select(top, urls, id, issue) %>%
@@ -101,7 +115,7 @@ Column
 
 ### SO QA
 
-```{r}
+```{r barplot-done}
 full_table %>%
   mutate(not_in_gh = if_else(is.na(issue), "not in GH yet", "Already in GH")) %>%
   ggplot(aes(not_in_gh, fill = not_in_gh)) +
@@ -121,7 +135,7 @@ Column
 
 ### Achievement
 
-```{r}
+```{r achievement-gauge}
 rate <- full_table %>% count(ok = !is.na(issue)) %>% filter(ok) %>% pull(n)
 flexdashboard::gauge(rate, 0, 500)
 ```
@@ -139,6 +153,9 @@ full_table %>%
 
 Data
 ============================
+
+Column
+----------------------------------------
 
 ### TOP 500 SO QA
 
