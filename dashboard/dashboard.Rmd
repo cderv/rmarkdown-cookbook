@@ -110,6 +110,8 @@ full_table <- so_in_gh %>%
 Dashboard
 ===========================
 
+Updated: `r Sys.time()`
+
 Column
 ----------------------------------------
 
@@ -151,13 +153,10 @@ full_table %>%
 ```
 
 
-Data
+Data 
 ============================
 
-Column
-----------------------------------------
-
-### TOP 500 SO QA
+### TOP 500 SO QA 
 
 This table contains TOP 500 QA from SO and where they are mentionned in issues
 
