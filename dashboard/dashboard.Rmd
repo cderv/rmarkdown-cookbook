@@ -179,8 +179,12 @@ Data
 This table contains TOP 500 QA from SO and where they are mentionned in issues
 
 ```{r render-full-table}
-DT::datatable(full_table %>% select(-issue), escape = FALSE, 
-              filter = "top",
+DT::datatable(full_table %>% 
+                select(-issue) %>%
+                # put top = 0 for non top 500 SO QA
+                mutate(top = if_else(is.na(top), 0L, top)),
+              escape = FALSE, 
+              filter = "top", 
               options = list(
                 columnDefs = list(list(className = 'dt-center', targets = 0:4))
               ))
