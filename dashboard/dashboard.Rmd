@@ -48,43 +48,47 @@ so_top_qa <- res %>%
 readr::write_csv("TOP500_QA_SO.csv")
 ```
 
-```{r get-so-in-gh, eval = !is_dev}
+```{r get-so-in-gh, eval = TRUE}
 # REM : NOT RUN IN DEV MODE (if IS_DEV env var is true)
 # Find QA already looked at on GH
 # Use github graphQL API
-library(ghrecipes)
-owner <- "mikey-harper"
-repo <- "rmarkdown-cookbook"
-ignored_issues <- c(4)
-issues <- get_issue_labels_state(owner, repo)
-get_all_thread <- map_dfr(issues$number, ~ get_issue_thread(owner, repo, .x))
-so_in_gh <- get_all_thread %>%
-  select(issue, body) %>%
-  # do not select some issue
-  filter(issue != 4) %>%
-  # get only issues with stackoverflow url
-  mutate(has_so_url = str_detect(body, "https://stackoverflow.com")) %>%
-  filter(has_so_url) %>%
-  mutate(so_url = str_extract_all(body, "\\bhttps://stackoverflow.com/[^\\s)]*")) %>%
-  unnest(so_url) %>%
-  # deal with comment shared url
-  mutate(so_url = map_if(so_url, 
-                         ~str_detect(.x, "https://stackoverflow.com/a/.*"), 
-                         ~httr::GET(.x)$url) %>% flatten_chr,
-         id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
-  select(issue, so_url_gh = so_url, id) %>%
-  distinct()
+if (!is_dev){
+  library(ghrecipes)
+  owner <- "mikey-harper"
+  repo <- "rmarkdown-cookbook"
+  ignored_issues <- c(4)
+  issues <- get_issue_labels_state(owner, repo)
+  get_all_thread <- map_dfr(issues$number, ~ get_issue_thread(owner, repo, .x))
+  so_in_gh <- get_all_thread %>%
+    select(issue, body) %>%
+    # do not select some issue
+    filter(issue != 4) %>%
+    # get only issues with stackoverflow url
+    mutate(has_so_url = str_detect(body, "https://stackoverflow.com")) %>%
+    filter(has_so_url) %>%
+    mutate(so_url = str_extract_all(body, "\\bhttps://stackoverflow.com/[^\\s)]*")) %>%
+    unnest(so_url) %>%
+    # deal with comment shared url
+    mutate(so_url = map_if(so_url, 
+                           ~str_detect(.x, "https://stackoverflow.com/a/.*"), 
+                           ~httr::GET(.x)$url) %>% flatten_chr,
+           id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
+    select(issue, so_url_gh = so_url, id) %>%
+    distinct()
+}
 ```
-
+  
 ```{r rds-for-dev, eval = FALSE}
 # saved once for dev purposes
 saveRDS(so_in_gh, "so_in_gh.rds")
 ```
 
-```{r load-dev-table, eval = is_dev}
+```{r load-dev-table, eval = FALSE}
 # only run if IS_DEV env var is TRUE
 # Purpose : Prevent github api request in dev mode
-so_in_gh <- readRDS("so_in_gh.rds")
+if (is_dev) {
+  so_in_gh <- readRDS("so_in_gh.rds")
+}
 ```
 
 
@@ -95,15 +99,19 @@ full_table <- so_in_gh %>%
   full_join(top_QA, by = "id") %>%
   select(top, urls, id, issue) %>%
   arrange(top) %>%
-  mutate(urls = map_chr(urls, ~htmltools::a(.x, href = .x, target="_blank") %>% as.character),
-         # create link toward issue
-         issue_link = map_chr(
-           issue, 
-           ~htmltools::a(.x,
-                         href = paste0("https://github.com/mikey-harper/rmarkdown-cookbook/issues/", .x),
-                         target="_blank") %>%
-                           as.character()
-         ))
+  mutate(
+    # build url for SO questions not in the top 500
+    urls = if_else(is.na(top), paste0("https://stackoverflow.com/questions/", id), urls),
+    # create link
+    urls = map_chr(urls, ~htmltools::a(.x, href = .x, target="_blank") %>% as.character),
+    # create link toward issue
+    issue_link = map_chr(
+      issue, 
+      ~htmltools::a(.x,
+                    href = paste0("https://github.com/mikey-harper/rmarkdown-cookbook/issues/", .x),
+                    target="_blank") %>%
+        as.character()
+    ))
 ```
 
 
@@ -126,7 +134,7 @@ full_table %>%
   theme_light() +
   scale_x_discrete(breaks = NULL) +
   labs(
-    title = "Nb of SO questions already in GH issues",
+    title = "Nb of SO questions in GH issues",
     x = NULL,
     fill = "Top SO QA"
   )
@@ -135,11 +143,21 @@ full_table %>%
 Column
 -------------------------------------------
 
-### Achievement
+### Achievement for the top 500
 
 ```{r achievement-gauge}
-rate <- full_table %>% count(ok = !is.na(issue)) %>% filter(ok) %>% pull(n)
-flexdashboard::gauge(rate, 0, 500)
+rate <- full_table %>% 
+  distinct(id, .keep_all = TRUE) %>%
+  filter(!is.na(top)) %>%
+  count(ok = !is.na(issue)) %>% 
+  filter(ok) %>% 
+  pull(n)
+flexdashboard::gauge(rate, 0, 
+                     full_table %>% 
+                       filter(!is.na(top)) %>%
+                       distinct(id) %>%
+                       count() %>%
+                       pull(n))
 ```
 
 ### Next Questions
@@ -156,11 +174,15 @@ full_table %>%
 Data 
 ============================
 
-### TOP 500 SO QA 
+### All SO questions mentionned in GH issues 
 
 This table contains TOP 500 QA from SO and where they are mentionned in issues
 
 ```{r render-full-table}
-DT::datatable(full_table %>% select(-issue), escape = FALSE)
+DT::datatable(full_table %>% select(-issue), escape = FALSE, 
+              filter = "top",
+              options = list(
+                columnDefs = list(list(className = 'dt-center', targets = 0:4))
+              ))
 ```
 
