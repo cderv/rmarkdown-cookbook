@@ -62,7 +62,7 @@ if (!is_dev){
   so_in_gh <- get_all_thread %>%
     select(issue, body) %>%
     # do not select some issue
-    filter(issue != 4) %>%
+    filter(!issue %in% ignored_issues) %>%
     # get only issues with stackoverflow url
     mutate(has_so_url = str_detect(body, "https://stackoverflow.com")) %>%
     filter(has_so_url) %>%
