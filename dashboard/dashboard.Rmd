@@ -54,7 +54,7 @@ readr::write_csv("TOP500_QA_SO.csv")
 # Use github graphQL API
 if (!is_dev){
   library(ghrecipes)
-  owner <- "mikey-harper"
+  owner <- "dr-harper"
   repo <- "rmarkdown-cookbook"
   ignored_issues <- c(4)
   issues <- get_issue_labels_state(owner, repo)
@@ -83,7 +83,7 @@ if (!is_dev){
 saveRDS(so_in_gh, "so_in_gh.rds")
 ```
 
-```{r load-dev-table, eval = FALSE}
+```{r load-dev-table, eval = TRUE}
 # only run if IS_DEV env var is TRUE
 # Purpose : Prevent github api request in dev mode
 if (is_dev) {
