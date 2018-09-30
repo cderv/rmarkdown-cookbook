@@ -2,7 +2,8 @@
 title: "Dashboard for SO questions in Rmarkdown Cookbook"
 output: 
   flexdashboard::flex_dashboard:
-    self_contained: false 
+    self_contained: false
+    orientation: rows 
 ---
 
 ```{r setup, include=FALSE}
@@ -60,7 +61,6 @@ if (!is_dev){
   issues <- get_issue_labels_state(owner, repo)
   get_all_thread <- map_dfr(issues$number, ~ get_issue_thread(owner, repo, .x))
   so_in_gh <- get_all_thread %>%
-    select(issue, body) %>%
     # do not select some issue
     filter(!issue %in% ignored_issues) %>%
     # get only issues with stackoverflow url
@@ -73,7 +73,9 @@ if (!is_dev){
                            ~str_detect(.x, "https://stackoverflow.com/a/.*"), 
                            ~httr::GET(.x)$url) %>% flatten_chr,
            id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
-    select(issue, so_url_gh = so_url, id) %>%
+    # Add status
+    mutate(status = if_else(grepl("^9999-01-01$", closed_at), "OPENED", "CLOSED")) %>%
+    select(issue, status, so_url_gh = so_url, id) %>%
     distinct()
 }
 ```
@@ -97,7 +99,7 @@ if (is_dev) {
 top_QA <- read_csv("TOP500_QA_SO.csv", col_types = "cic")
 full_table <- so_in_gh %>%
   full_join(top_QA, by = "id") %>%
-  select(top, urls, id, issue) %>%
+  select(top, urls, id, issue, status) %>%
   arrange(top) %>%
   mutate(
     # build url for SO questions not in the top 500
@@ -120,30 +122,24 @@ Dashboard
 
 Updated: `r Sys.time()`
 
-Column
+Row
 ----------------------------------------
 
-### SO QA
+### Nb of questions in closed GH ticket
 
-```{r barplot-done}
-full_table %>%
-  mutate(not_in_gh = if_else(is.na(issue), "not in GH yet", "Already in GH")) %>%
-  ggplot(aes(not_in_gh, fill = not_in_gh)) +
-  geom_bar(position = "dodge") +
-  geom_text(aes(label = stat(count), y = stat(count)), stat = "count", vjust = -0.5, hjust = 0.5) +
-  theme_light() +
-  scale_x_discrete(breaks = NULL) +
-  labs(
-    title = "Nb of SO questions in GH issues",
-    x = NULL,
-    fill = "Top SO QA"
-  )
+```{r}
+closed_rate <- full_table %>% 
+  filter(!is.na(issue)) %>% 
+  group_by(id) %>% 
+  summarise(CLOSED = all(status == "CLOSED")) %>% 
+  count(CLOSED)
+flexdashboard::gauge(closed_rate %>% filter(CLOSED == TRUE) %>% pull(n),
+                     0, 
+                     sum(closed_rate$n))
 ```
 
-Column
--------------------------------------------
 
-### Achievement for the top 500
+### Achievement of the top 500 report in SO
 
 ```{r achievement-gauge}
 rate <- full_table %>% 
@@ -159,6 +155,39 @@ flexdashboard::gauge(rate, 0,
                        count() %>%
                        pull(n))
 ```
+
+### Nb of SO questions reported (Top 500 or not)
+
+```{r all-so}
+flexdashboard::valueBox(
+  full_table %>% filter(is.na(top)) %>% count() %>% pull(n),
+  caption = "# SO QA not in TOP 500",
+  icon = "fa-stack-overflow"
+)
+```
+
+
+Row
+---------------------------
+
+### SO QA in GH
+
+```{r barplot-done}
+full_table %>%
+  distinct(id, .keep_all = TRUE) %>%
+  mutate(not_in_gh = if_else(is.na(issue), "not in GH yet", "Already in GH")) %>%
+  ggplot(aes(not_in_gh, fill = not_in_gh)) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(label = stat(count), y = stat(count)), stat = "count", vjust = -0.5, hjust = 0.5) +
+  theme_light() +
+  scale_x_discrete(breaks = NULL) +
+  labs(
+    title = "Nb of SO questions in GH issues",
+    x = NULL,
+    fill = "Top SO QA"
+  )
+```
+
 
 ### Next Questions
 
