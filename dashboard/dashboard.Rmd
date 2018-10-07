@@ -50,6 +50,10 @@ readr::write_csv("TOP500_QA_SO.csv")
 ```
 
 ```{r get-so-in-gh, eval = TRUE}
+# helpers
+get_so_id <- function(so_url) {
+  str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")
+}
 # REM : NOT RUN IN DEV MODE (if IS_DEV env var is true)
 # Find QA already looked at on GH
 # Use github graphQL API
@@ -72,7 +76,7 @@ if (!is_dev){
     mutate(so_url = map_if(so_url, 
                            ~str_detect(.x, "https://stackoverflow.com/a/.*"), 
                            ~httr::GET(.x)$url) %>% flatten_chr,
-           id = str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")) %>%
+           id = get_so_id(so_url)) %>%
     # Add status
     mutate(status = if_else(grepl("^9999-01-01$", closed_at), "OPENED", "CLOSED")) %>%
     select(issue, status, so_url_gh = so_url, id) %>%
@@ -97,6 +101,10 @@ if (is_dev) {
 ```{r data-top-500-in-gh}
 # summary of already dealt issues
 top_QA <- read_csv("TOP500_QA_SO.csv", col_types = "cic")
+ignored_qa <- gistr::gist("https://gist.github.com/cderv/76728b02c13e429c843cc8b3b7226f11") %>%
+  purrr::pluck("files", "ignored_qa.txt", "raw_url") %>%
+  readr::read_tsv(col_names = "so_url", col_types = "c") %>%
+  dplyr::mutate(id = get_so_id(so_url))
 full_table <- so_in_gh %>%
   full_join(top_QA, by = "id") %>%
   select(top, urls, id, issue, status) %>%
@@ -110,10 +118,11 @@ full_table <- so_in_gh %>%
     issue_link = map_chr(
       issue, 
       ~htmltools::a(.x,
-                    href = paste0("https://github.com/mikey-harper/rmarkdown-cookbook/issues/", .x),
+                    href = paste0("https://github.com/dr-harper/rmarkdown-cookbook/issues/", .x),
                     target="_blank") %>%
-        as.character()
-    ))
+        as.character()),
+    ignored = id %in% ignored_qa$id 
+  )
 ```
 
 
@@ -145,7 +154,8 @@ flexdashboard::gauge(closed_rate %>% filter(CLOSED == TRUE) %>% pull(n),
 rate <- full_table %>% 
   distinct(id, .keep_all = TRUE) %>%
   filter(!is.na(top)) %>%
-  count(ok = !is.na(issue)) %>% 
+  # an ignored sa is count as treated
+  count(ok = !is.na(issue) | ignored) %>% 
   filter(ok) %>% 
   pull(n)
 flexdashboard::gauge(rate, 0, 
@@ -161,8 +171,7 @@ flexdashboard::gauge(rate, 0,
 ```{r all-so}
 flexdashboard::valueBox(
   full_table %>% filter(is.na(top)) %>% count() %>% pull(n),
-  caption = "# SO QA not in TOP 500",
-  icon = "fa-stack-overflow"
+  caption = "Number of SO QA not in TOP 500"
 )
 ```
 
@@ -193,7 +202,7 @@ full_table %>%
 
 ```{r left-questions}
 full_table %>%
-  filter(is.na(issue)) %>%
+  filter(is.na(issue) & !ignored) %>%
   select(top, urls) %>%
   arrange(top) %>%
   DT::datatable(escape = FALSE)
@@ -203,19 +212,41 @@ full_table %>%
 Data 
 ============================
 
+Row {.tabset .tabset-fade}
+-------------------------------------------
+
+```{r dt-wrapper, include = FALSE}
+data_table <- function(tab, ...) {
+  DT::datatable(tab,
+                escape = FALSE, 
+                filter = "top")
+}
+```
+
+
 ### All SO questions mentionned in GH issues 
 
 This table contains TOP 500 QA from SO and where they are mentionned in issues
 
 ```{r render-full-table}
-DT::datatable(full_table %>% 
-                select(-issue) %>%
-                # put top = 0 for non top 500 SO QA
-                mutate(top = if_else(is.na(top), 0L, top)),
-              escape = FALSE, 
-              filter = "top", 
-              options = list(
-                columnDefs = list(list(className = 'dt-center', targets = 0:4))
-              ))
+data_table(full_table %>% 
+             filter(!is.na(issue)) %>%
+             select(-issue) %>%
+             # put top = 0 for non top 500 SO QA
+             mutate(top = if_else(is.na(top), 0L, top)) %>%
+             filter(!ignored),
+           options = list(
+             columnDefs = list(list(className = 'dt-center', targets = 0:4))
+           ))
 ```
+
+### Ignored SO QA
+
+```{r ignored_qa}
+data_table(full_table %>%
+                semi_join(ignored_qa, by = "id") %>%
+                select(top, urls, id), 
+)
+```
+
 
