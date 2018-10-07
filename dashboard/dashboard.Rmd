@@ -175,6 +175,15 @@ flexdashboard::valueBox(
 )
 ```
 
+### Nb of ignored questions
+
+```{r ignored-so}
+flexdashboard::valueBox(
+  nrow(ignored_qa),
+  caption = "Number of ignored QA from TOP 500, not reported in GH"
+)
+```
+
 
 Row
 ---------------------------
