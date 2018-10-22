@@ -49,6 +49,16 @@ so_top_qa <- res %>%
 readr::write_csv("TOP500_QA_SO.csv")
 ```
 
+```{r parsing-most-viewed}
+# Exported from 
+# https://data.stackexchange.com/stackoverflow/query/341524/most-viewed-questions-in-tag#resultSets
+# on 22/10/2018
+most_viewed <- read_csv("MOST_VIEWED_QA_SO.csv", 
+    col_types = cols(`Post Link` = col_character())) %>%
+  arrange(desc(ViewCount)) %>%
+  mutate(most_viewed_order = row_number())
+```
+
 ```{r get-so-in-gh, eval = TRUE}
 # helpers
 get_so_id <- function(so_url) {
