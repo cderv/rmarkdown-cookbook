@@ -183,12 +183,30 @@ flexdashboard::gauge(rate, 0,
                        pull(n))
 ```
 
-### Nb of SO questions reported (Top 500 or not)
+### Achievement of the top 500 MOST VIEWED
+
+```{r achievement-gauge}
+rate <- full_table %>% 
+  distinct(id, .keep_all = TRUE) %>%
+  filter(!is.na(most_viewed)) %>%
+  # an ignored sa is count as treated
+  count(ok = !is.na(issue) | ignored) %>% 
+  filter(ok) %>% 
+  pull(n)
+flexdashboard::gauge(rate, 0, 
+                     full_table %>% 
+                       filter(!is.na(most_viewed)) %>%
+                       distinct(id) %>%
+                       count() %>%
+                       pull(n))
+```
+
+### Nb of SO questions reported not in either Tops)
 
 ```{r all-so}
 flexdashboard::valueBox(
-  full_table %>% filter(is.na(top)) %>% count() %>% pull(n),
-  caption = "Number of SO QA not in TOP 500"
+  full_table %>% filter(is.na(top) & is.na(most_viewed)) %>% count() %>% pull(n),
+  caption = "Number of SO QA not in TOP or most viewed"
 )
 ```
 
