@@ -56,7 +56,8 @@ readr::write_csv("TOP500_QA_SO.csv")
 most_viewed <- read_csv("MOST_VIEWED_QA_SO.csv", 
     col_types = cols(`Post Link` = col_character())) %>%
   arrange(desc(ViewCount)) %>%
-  mutate(most_viewed_order = row_number())
+  rename(id = `Post Link`) %>%
+  mutate(most_viewed = row_number())
 ```
 
 ```{r get-so-in-gh, eval = TRUE}
@@ -116,12 +117,17 @@ ignored_qa <- gistr::gist("https://gist.github.com/cderv/76728b02c13e429c843cc8b
   readr::read_tsv(col_names = "so_url", col_types = "c") %>%
   dplyr::mutate(id = get_so_id(so_url))
 full_table <- so_in_gh %>%
+  # add top QA
   full_join(top_QA, by = "id") %>%
-  select(top, urls, id, issue, status) %>%
-  arrange(top) %>%
+  # add most viewed already Top QA
+  left_join(most_viewed %>% select(id, ViewCount, most_viewed), by = "id") %>%
+  # add most 500 viewed not already in
+  full_join(most_viewed %>% select(id, ViewCount, most_viewed) %>% filter(most_viewed <= 500)) %>%
+  select(top, urls, id, issue, status, most_viewed, ViewCount) %>%
+  arrange(top, most_viewed) %>%
   mutate(
     # build url for SO questions not in the top 500
-    urls = if_else(is.na(top), paste0("https://stackoverflow.com/questions/", id), urls),
+    urls = if_else(is.na(urls), paste0("https://stackoverflow.com/questions/", id), urls),
     # create link
     urls = map_chr(urls, ~htmltools::a(.x, href = .x, target="_blank") %>% as.character),
     # create link toward issue
@@ -149,6 +155,7 @@ Row
 ```{r}
 closed_rate <- full_table %>% 
   filter(!is.na(issue)) %>% 
+  distinct(id, .keep_all = TRUE) %>%
   group_by(id) %>% 
   summarise(CLOSED = all(status == "CLOSED")) %>% 
   count(CLOSED)
