@@ -165,7 +165,7 @@ flexdashboard::gauge(closed_rate %>% filter(CLOSED == TRUE) %>% pull(n),
 ```
 
 
-### Achievement of the top 500 report in SO
+### Achievement of the top 500 report in GH
 
 ```{r achievement-gauge}
 rate <- full_table %>% 
@@ -185,7 +185,7 @@ flexdashboard::gauge(rate, 0,
 
 ### Achievement of the top 500 MOST VIEWED
 
-```{r achievement-gauge}
+```{r achievement-gauge-most-viewed}
 rate <- full_table %>% 
   distinct(id, .keep_all = TRUE) %>%
   filter(!is.na(most_viewed)) %>%
@@ -215,7 +215,7 @@ flexdashboard::valueBox(
 ```{r ignored-so}
 flexdashboard::valueBox(
   nrow(ignored_qa),
-  caption = "Number of ignored QA from TOP 500, not reported in GH"
+  caption = "Number of ignored SO QA, not reported in GH"
 )
 ```
 
@@ -244,11 +244,11 @@ full_table %>%
 
 ### Next Questions
 
-```{r left-questions}
+```{r next-questions}
 full_table %>%
   filter(is.na(issue) & !ignored) %>%
-  select(top, urls) %>%
-  arrange(top) %>%
+  select(top, most_viewed, urls) %>%
+  arrange(pmin(top, most_viewed)) %>%
   DT::datatable(escape = FALSE)
 ```
 
@@ -270,14 +270,15 @@ data_table <- function(tab, ...) {
 
 ### All SO questions mentionned in GH issues 
 
-This table contains TOP 500 QA from SO and where they are mentionned in issues
+This table contains QA from SO and where they are mentionned in issues
 
 ```{r render-full-table}
 data_table(full_table %>% 
              filter(!is.na(issue)) %>%
              select(-issue) %>%
              # put top = 0 for non top 500 SO QA
-             mutate(top = if_else(is.na(top), 0L, top)) %>%
+             mutate(top = if_else(is.na(top), 0L, top),
+                    most_viewed = if_else(is.na(most_viewed), 0L, most_viewed)) %>%
              filter(!ignored),
            options = list(
              columnDefs = list(list(className = 'dt-center', targets = 0:4))
