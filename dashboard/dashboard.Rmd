@@ -164,44 +164,82 @@ flexdashboard::gauge(closed_rate %>% filter(CLOSED == TRUE) %>% pull(n),
                      sum(closed_rate$n))
 ```
 
+```{r, include = FALSE}
+summary_qa <- function(full_table, type) {
+  type <- enquo(type)
+  full_table %>% 
+    distinct(id, .keep_all = TRUE) %>%
+    filter(!is.na(!!type)) %>%
+    mutate(cat = case_when(
+      !is.na(issue) ~ "in_gh",
+      ignored       ~ "ignored",
+      TRUE          ~ "not reported"
+    )) %>%
+    count(cat)
+}
 
-### Achievement of the top 500 report in GH
+achievement_gauge <- function(full_table, type) {
+  type <- enquo(type)
+  tab <- full_table %>%
+    summary_qa(!!type) %>%
+    mutate(ok = !cat == "not reported") %>%
+    group_by(ok) %>%
+    summarise(n = sum(n))
+  flexdashboard::gauge(tab %>% filter(ok) %>% pull(n), min = 0, max = sum(tab$n))
+}
+
+vb_custom <- function(full_table, type, category, caption = "", color = "blue") {
+  type <- enquo(type)
+  full_table %>% 
+    summary_qa(!!type) %>% 
+    filter(cat == category) %>%
+    pull(n) %>%
+    flexdashboard::valueBox(caption = caption, color = color)
+}
+
+vb_in_gh <- function(full_table, type, caption = "") {
+  type <- enquo(type)
+  vb_custom(full_table, !!type, "in_gh", caption, "green")
+}
+
+vb_ignored <- function(full_table, type, caption = "") {
+  type <- enquo(type)
+  vb_custom(full_table, !!type, "ignored", caption, "darkgrey")
+}
+```
+
+### Number of QA reported in GH
+
+```{r total-in-gh}
+full_table %>% 
+  filter(!is.na(issue)) %>%
+  distinct(id) %>%
+  count() %>%
+  pull(n) %>%
+  flexdashboard::valueBox(caption = "QA in total in GH", color = "MediumSeaGreen")
+```
+
+Row
+-------------
+
+### Achievement on the top 500
 
 ```{r achievement-gauge}
-rate <- full_table %>% 
-  distinct(id, .keep_all = TRUE) %>%
-  filter(!is.na(top)) %>%
-  # an ignored sa is count as treated
-  count(ok = !is.na(issue) | ignored) %>% 
-  filter(ok) %>% 
-  pull(n)
-flexdashboard::gauge(rate, 0, 
-                     full_table %>% 
-                       filter(!is.na(top)) %>%
-                       distinct(id) %>%
-                       count() %>%
-                       pull(n))
+achievement_gauge(full_table, top)
 ```
 
-### Achievement of the top 500 MOST VIEWED
+### Achievement on MOST VIEWED
 
 ```{r achievement-gauge-most-viewed}
-rate <- full_table %>% 
-  distinct(id, .keep_all = TRUE) %>%
-  filter(!is.na(most_viewed)) %>%
-  # an ignored sa is count as treated
-  count(ok = !is.na(issue) | ignored) %>% 
-  filter(ok) %>% 
-  pull(n)
-flexdashboard::gauge(rate, 0, 
-                     full_table %>% 
-                       filter(!is.na(most_viewed)) %>%
-                       distinct(id) %>%
-                       count() %>%
-                       pull(n))
+achievement_gauge(full_table, most_viewed)
 ```
 
-### Nb of SO questions reported not in either Tops)
+
+
+Row
+----------------------------
+
+### Nb of SO questions reported not in either Tops
 
 ```{r all-so}
 flexdashboard::valueBox(
@@ -219,9 +257,48 @@ flexdashboard::valueBox(
 )
 ```
 
+Row
+---------------------------
+
+### Nb of top 500 reported in GH
+
+```{r top-in-gh}
+vb_in_gh(full_table, top, "Nb of top 500 reported in GH")
+```
+
+### Nb of most viewed reported in GH
+
+```{r most_viewed-in-gh}
+vb_in_gh(full_table, most_viewed, "Nb of most viewed reported in GH")
+```
+
+### Nb of top 500 ignored
+
+```{r top-ignored}
+vb_ignored(full_table, top, "Nb of top 500 ignored")
+```
+
+### Nb of most_viewed ignored
+
+```{r most-viewed-ignored}
+vb_ignored(full_table, top, "Nb of most viewed ignored")
+```
+
+Next questions 
+============================
 
 Row
 ---------------------------
+
+### Next Questions
+
+```{r next-questions}
+full_table %>%
+  filter(is.na(issue) & !ignored) %>%
+  select(top, most_viewed, urls) %>%
+  arrange(pmin(top, most_viewed)) %>%
+  DT::datatable(escape = FALSE)
+```
 
 ### SO QA in GH
 
@@ -239,17 +316,6 @@ full_table %>%
     x = NULL,
     fill = "Top SO QA"
   )
-```
-
-
-### Next Questions
-
-```{r next-questions}
-full_table %>%
-  filter(is.na(issue) & !ignored) %>%
-  select(top, most_viewed, urls) %>%
-  arrange(pmin(top, most_viewed)) %>%
-  DT::datatable(escape = FALSE)
 ```
 
 
