@@ -104,7 +104,7 @@ if (!is_dev){
   knit_example_in_gh <- get_all_thread %>%
     filter(!issue %in% ignored_issues) %>%
     # get only issues with stackoverflow url
-    mutate(has_ke_url = str_detect(body, "https://github.com/yihui/knitr-examples")) %>%
+    mutate(has_ke_url = str_detect(body, "https://github.com/yihui/knitr-examples[/]?[^\\s)]")) %>%
     filter(has_ke_url) %>%
     mutate(ke_url = str_extract_all(body, "\\bhttps://github.com/yihui/knitr-examples[^\\s)]*")) %>%
     unnest(ke_url) %>%
