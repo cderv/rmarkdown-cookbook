@@ -65,10 +65,18 @@ most_viewed <- read_csv("MOST_VIEWED_QA_SO.csv",
 get_so_id <- function(so_url) {
   str_extract(so_url, "(?<=questions/)\\d{8}(?=/.*)")
 }
+get_ke_example <- function(ke_url) {
+  example <- str_extract(ke_url, "(?<=knitr-examples/blob/master/)\\d{3}.*(?=\\.[:alpha:])")
+  list(id = str_extract(example, "^\\d{3}") %>% as.numeric(),
+       name = str_extract(example, "(?<=\\d{3}-).*")
+  )
+}
+
 # REM : NOT RUN IN DEV MODE (if IS_DEV env var is true)
 # Find QA already looked at on GH
 # Use github graphQL API
 if (!is_dev){
+
   library(ghrecipes)
   owner <- "dr-harper"
   repo <- "rmarkdown-cookbook"
@@ -92,12 +100,25 @@ if (!is_dev){
     mutate(status = if_else(grepl("^9999-01-01$", closed_at), "OPENED", "CLOSED")) %>%
     select(issue, status, so_url_gh = so_url, id) %>%
     distinct()
+  # get knitr example
+  knit_example_in_gh <- get_all_thread %>%
+    filter(!issue %in% ignored_issues) %>%
+    # get only issues with stackoverflow url
+    mutate(has_ke_url = str_detect(body, "https://github.com/yihui/knitr-examples")) %>%
+    filter(has_ke_url) %>%
+    mutate(ke_url = str_extract_all(body, "\\bhttps://github.com/yihui/knitr-examples[^\\s)]*")) %>%
+    unnest(ke_url) %>%
+    mutate(example = map(ke_url, get_ke_example)) %>%
+    mutate(id = map_dbl(example, "id"),
+           name = map_chr(example, "name"),
+           example = NULL)
+  # saved once for dev purposes
+  saveRDS(so_in_gh, "so_in_gh.rds")
+  saveRDS(knit_example_in_gh, "knit_example_in_gh.rds")
 }
 ```
   
 ```{r rds-for-dev, eval = FALSE}
-# saved once for dev purposes
-saveRDS(so_in_gh, "so_in_gh.rds")
 ```
 
 ```{r load-dev-table, eval = TRUE}
@@ -105,6 +126,7 @@ saveRDS(so_in_gh, "so_in_gh.rds")
 # Purpose : Prevent github api request in dev mode
 if (is_dev) {
   so_in_gh <- readRDS("so_in_gh.rds")
+  knit_example_in_gh <- readRDS("knit_example_in_gh.rds")
 }
 ```
 
