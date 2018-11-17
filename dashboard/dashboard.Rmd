@@ -108,10 +108,11 @@ if (!is_dev){
     filter(has_ke_url) %>%
     mutate(ke_url = str_extract_all(body, "\\bhttps://github.com/yihui/knitr-examples[^\\s)]*")) %>%
     unnest(ke_url) %>%
-    mutate(example = map(ke_url, get_ke_example)) %>%
-    mutate(id = map_dbl(example, "id"),
+    mutate(example = map(ke_url, get_ke_example),
+           id = map_dbl(example, "id"),
            name = map_chr(example, "name"),
-           example = NULL)
+           status = if_else(grepl("^9999-01-01$", closed_at), "OPENED", "CLOSED")) %>%
+    select(issue, status, id, name, ke_url, comment_url)
   # saved once for dev purposes
   saveRDS(so_in_gh, "so_in_gh.rds")
   saveRDS(knit_example_in_gh, "knit_example_in_gh.rds")
@@ -239,6 +240,16 @@ full_table %>%
   count() %>%
   pull(n) %>%
   flexdashboard::valueBox(caption = "QA in total in GH", color = "MediumSeaGreen")
+```
+
+### Number of knitr example reported in GH
+
+```{r nb-knitr-ex}
+knit_example_in_gh %>% 
+  distinct(id) %>%
+  count() %>%
+  pull(n) %>%
+  flexdashboard::valueBox(caption = "Number of knitr examples reported in GH", color = "purple")
 ```
 
 Row
@@ -379,6 +390,20 @@ data_table(full_table %>%
 data_table(full_table %>%
                 semi_join(ignored_qa, by = "id") %>%
                 select(top, urls, id), 
+)
+```
+
+### Knitr Examples
+
+```{r knitr_ex_data}
+data_table(knit_example_in_gh %>%
+             mutate(
+               urls = map_chr(ke_url, 
+                              ~ htmltools::a(.x, href = .x, target="_blank") %>% as.character),
+               issue_url = map_chr(comment_url, 
+                                   ~ htmltools::a(.x, href = .x, target="_blank") %>% as.character),
+             ) %>%
+             select(id, name, urls, issue_url)
 )
 ```
 
