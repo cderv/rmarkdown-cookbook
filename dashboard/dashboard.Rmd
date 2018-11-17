@@ -403,7 +403,8 @@ data_table(knit_example_in_gh %>%
                issue_url = map_chr(comment_url, 
                                    ~ htmltools::a(.x, href = .x, target="_blank") %>% as.character),
              ) %>%
-             select(id, name, urls, issue_url)
+             select(id, name, urls, issue_url) %>%
+             arrange(id)
 )
 ```
 
