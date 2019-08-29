@@ -343,7 +343,7 @@ source("helpers.R")
 ```
 ````
 
-However, this would not render in the output the content of `helpers.R` but only the content of the chunk. To succeed, you can use the `code` chunk option
+However, this would not render in the output the content of `helpers.R` but only the content of the chunk. To succeed, you can use the `code` chunk option^[You can learn more about chunk options in [@xie2015] and [@xie2018]. You will also find other examples in Section \@ref(knitr-options)]
 
 ````r
 ```{r, code = xfun::read_utf8("helpers.R")}`r ''`
@@ -352,4 +352,4 @@ However, this would not render in the output the content of `helpers.R` but only
 
 This will read the content of the file and fill the chunk with it before executing the chunk as usual.
 
-You can learn more about chunk options in Section \@ref(knitr-options)
+
