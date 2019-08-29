@@ -13,7 +13,7 @@ With larger R Markdown projects, it can be useful to split the document into sma
 
 In this section, we highlight two approaches which can be used when splitting an R Markdown document into separate `.Rmd` files, using child documents and the **bookdown** [@R-bookdown] package. Most importantly, we will highlight when it is preferred for each to be used within your analysis.
 
-### Child documents
+### Child documents {#child-documents}
 
 We can include other R Markdown documents within a file by using child documents. The contents of the child document is loaded into the parent document, and any R code will be run as normally within **knitr**.
 
@@ -352,4 +352,4 @@ However, this would not render in the output the content of `helpers.R` but only
 
 This will read the content of the file and fill the chunk with it before executing the chunk as usual.
 
-
+Importing a chunk from another R Markdown file is also possible as explained at \@ref(child-documents).
