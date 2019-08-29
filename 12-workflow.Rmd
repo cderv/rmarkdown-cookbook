@@ -331,3 +331,25 @@ pandoc can be found in *R Markdown Definitive Guide* [@xie2018]]
 import_example("generate-latex-header-with-cat-engine.Rmd")
 ```
 
+## Import an R script inside a code chunk {#code-chunk-script}
+
+Another situation is when an author wishes to use an existing R script as the content of a code chunk. This could happen for example with a long already existing analysis script or to import some helpers functions contained in another script. 
+
+To use such script, one could source it in a chunk of the R Markdown document
+
+````r
+```{r}`r ''`
+source("helpers.R")
+```
+````
+
+However, this would not render in the output the content of `helpers.R` but only the content of the chunk. To succeed, you can use the `code` chunk option
+
+````r
+```{r, code = xfun::read_utf8("helpers.R")}`r ''`
+```
+````
+
+This will read the content of the file and fill the chunk with it before executing the chunk as usual.
+
+You can learn more about chunk options in Section \@ref(knitr-options)
