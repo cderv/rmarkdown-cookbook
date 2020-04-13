@@ -46,13 +46,13 @@ so_top_qa <- res %>%
     top = row_number(),
     id = str_extract(urls, "(?<=/)\\d{8}(?=/)") 
   )
-readr::write_csv("TOP500_QA_SO.csv")
+readr::write_csv(so_top_qa, "TOP500_QA_SO.csv")
 ```
 
 ```{r parsing-most-viewed}
 # Exported from 
 # https://data.stackexchange.com/stackoverflow/query/341524/most-viewed-questions-in-tag#resultSets
-# on 22/10/2018
+# on 13/04/2020
 most_viewed <- read_csv("MOST_VIEWED_QA_SO.csv", 
     col_types = cols(`Post Link` = col_character())) %>%
   arrange(desc(ViewCount)) %>%
@@ -76,9 +76,9 @@ get_ke_example <- function(ke_url) {
 # Find QA already looked at on GH
 # Use github graphQL API
 if (!is_dev){
-
+  # remotes::install_github("cderv/ghrecipes@crul-expected-header")
   library(ghrecipes)
-  owner <- "dr-harper"
+  owner <- "yihui"
   repo <- "rmarkdown-cookbook"
   ignored_issues <- c(4)
   issues <- get_issue_labels_state(owner, repo)
@@ -119,9 +119,6 @@ if (!is_dev){
 }
 ```
   
-```{r rds-for-dev, eval = FALSE}
-```
-
 ```{r load-dev-table, eval = TRUE}
 # only run if IS_DEV env var is TRUE
 # Purpose : Prevent github api request in dev mode
