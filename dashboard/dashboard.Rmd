@@ -29,8 +29,11 @@ nb_page <- ceiling(top / 50)
 # nb_page <- 1
 res <- seq_len(nb_page) %>%
   map(~ scrape(session, 
-               params = glue::glue("page={page_nb}&sort=votes&pagesize={result_per_page}", 
-                                   page_nb = .x), verbose = TRUE
+               params =
+                 glue::glue(
+                   "page={page_nb}&sort=votes&pagesize={result_per_page}", 
+                   page_nb = .x), 
+               verbose = TRUE
   ))
 ```
 
@@ -76,7 +79,7 @@ get_ke_example <- function(ke_url) {
 # Find QA already looked at on GH
 # Use github graphQL API
 if (!is_dev){
-  # remotes::install_github("cderv/ghrecipes@crul-expected-header")
+  # remotes::install_github("ropenscilabs/ghrecipes")
   library(ghrecipes)
   owner <- "yihui"
   repo <- "rmarkdown-cookbook"
@@ -154,7 +157,7 @@ full_table <- so_in_gh %>%
     issue_link = map_chr(
       issue, 
       ~htmltools::a(.x,
-                    href = paste0("https://github.com/dr-harper/rmarkdown-cookbook/issues/", .x),
+                    href = paste0("https://github.com/yihui/rmarkdown-cookbook/issues/", .x),
                     target="_blank") %>%
         as.character()),
     ignored = id %in% ignored_qa$id 
@@ -404,5 +407,4 @@ data_table(knit_example_in_gh %>%
              arrange(id)
 )
 ```
-
 
