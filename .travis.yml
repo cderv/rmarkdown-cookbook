@@ -1,11 +1,18 @@
 language: r
 cache: packages
-pandoc_version: 1.19.2.1
+pandoc_version: 2.3.1
 
-before_script:
-  - chmod +x ./_build.sh
-  - chmod +x ./_deploy.sh
+addons:
+  apt:
+    packages:
+    - cargo
+    - libpoppler-cpp-dev
+    - libmagick++-dev
+    - asymptote
+
+services:
+  - xvfb
 
 script:
-  - ./_build.sh
+  - xvfb-run -a make gitbook
   - ./_deploy.sh

@@ -2,8 +2,13 @@
 .Rhistory
 .RData
 .Ruserdata
-book/_book/*
-book/_bookdown_files/*
+rsconnect
+_book/*
+_bookdown_files/*
+packages.bib
+*-tikzDictionary
+css/customBlock.css
+latex/customBlock.tex
 
 # OS generated files #
 ######################

@@ -1,0 +1,406 @@
+# HTML Output
+
+Compared to LaTeX, HTML may be a little weak in typesetting for paged output, but it is much more powerful in presenting results, especially when combined with CSS and JavaScript. For example, you can embed interactive applications in HTML, and dynamically modify the appearance and even the content of an HTML page. Some useful yet simple CSS and JavaScript tricks for HTML output are very difficult (and often impossible) to reproduce in LaTeX output. In this chapter, we show examples on how to enhance your HTML output from R Markdown.
+
+## Apply custom CSS {#html-css}
+
+We strongly recommend that you learn some CSS and JavaScript if you wish to customize the appearance of HTML documents. The [Appendix B](https://bookdown.org/yihui/blogdown/website-basics.html) of the **blogdown** book [blogdown2017] contains short tutorials on HTML, CSS, and JavaScript.
+
+For beginners, it is extremely important to understand selectors and precedence of rules in CSS, otherwise you may be confused why your custom CSS rules do not work as expected (they may not have enough precedence).
+
+To include one or multiple custom stylesheets in an Rmd document, you can use the `css` option, e.g.,
+
+```yaml
+output:
+  html_document:
+    css: "style.css"
+    # or multiple sheets in an array
+    # css: ["style-1.css", "style-2.css"]
+```
+
+Alternatively, you can use a `css` code chunk to embed the CSS rules directly in your Rmd document, e.g.,
+
+````md
+We embed a `css` code chunk here.
+
+```{css, echo=FALSE}`r ''`
+p {
+  font-size: 32px;
+}
+```
+````
+
+The chunk option `echo = FALSE` means the CSS code will not be displayed verbatim in the output, but a `<style>` tag containing the CSS code will be generated to the HTML output file.
+
+## Center section headings {#center-heading}
+
+As an application of the methods mentioned in Section \@ref(html-css), we can use CSS to adjust the alignment of headings. For example, you may center section headings of level 1, 2, and 3 with the CSS code below:
+
+```css
+h1, h2, h3 {
+  text-align: center;
+}
+```
+
+Please see Section \@ref(html-css) on how to apply the CSS to your Rmd document.
+
+## Use a custom HTML template {#html-template}
+
+We mentioned LaTeX templates in Section \@ref(latex-template). You can also specify a custom HTML template for Pandoc to convert Markdown to HTML. Below is a brief example template:
+
+```html
+<html>
+  <head>
+    <title>$title$</title>
+    $for(css)$
+    <link rel="stylesheet" href="$css$" type="text/css" />
+    $endfor$
+  </head>
+  <body>
+  $body$
+  </body>
+</html>
+```
+
+You can see that the template contains a few variables such as `$title$` and `$body$`. You can find the full list of Pandoc variables and their meanings at https://pandoc.org/MANUAL.html#templates.
+
+The template gives you the ultimate power to customize the HTML output. For example, you can include arbitrary CSS stylesheets or JavaScript code or libraries in the `<head>` area. For example, we could use a Boolean variable `draft` to indicate whether the document is a draft or a final version:
+
+```html
+<head>
+<style type="text/css">
+.logo {
+  float: right;
+}
+</style>
+</head>
+
+<body>
+<div class="logo">
+$if(draft)$
+<!-- use draft.png to show that this is a draft -->
+<img src="images/draft.png" alt="Draft mode" />
+$else$
+<!-- insert the formal logo if this is final -->
+<img src="images/logo.png" alt="Final version" />
+$endif$
+</div>
+
+$body$
+</body>
+```
+
+Then we can set the variable `draft` to `true` or `false` in the YAML metadata of the Rmd document, e.g.,
+
+```yaml
+---
+title: "An Important Report"
+draft: true
+---
+```
+
+To apply a template to an Rmd document, you can save the template to a file, and pass the file path to the `template` option of `html_document`, e.g.,
+
+```yaml
+output:
+  html_output:
+    template: my-template.html
+```
+
+The **rmarkdown** package uses a custom HTML template shipped with the package, which is different from Pandoc's default template. To use the latter, you can specify `template: null`.
+
+## Style code blocks and text output {#chunk-styling}
+
+<!-- https://stackoverflow.com/questions/41030477/changing-chunk-background-color-in-rmarkdown -->
+
+We can customize the style of code chunks and their text output using the chunk options `class.source` and `class.output`, respectively. These options take character vectors of class names. For example, when `class.source = "important"`, the HTML element containing the code chunk in the output will have a class `important`. Then you can define CSS rules for this class. This can be useful when you want to highlight a certain code chunk or its text output.
+
+By default, the HTML output of R Markdown includes the Bootstrap framework, which makes it easy for you to change the appearance of your code and output, because Bootstrap has predefined some [CSS classes for backgrounds:](https://getbootstrap.com/docs/3.4/css/#helper-classes): `"bg-primary"`, `"bg-success"`, `"bg-info"`, `"bg-warning"`, and `"bg-danger"`.
+
+Below is an example using the chunk options `class.source = "bg-danger"` and `class.output = "bg-warning"`, and you can see its output in Figure \@ref(fig:chunk-bg).
+
+`r import_example('chunk-style.Rmd')`
+
+```{r chunk-bg, echo=FALSE, fig.cap="A code chunk and its text output with background colors defined by Bootstrap."}
+knitr::include_graphics("images/chunk-bg.png", dpi = NA)
+```
+
+You can also use arbitrary class names and define CSS rules accordingly. In this case, you will have to include your custom CSS rules using the methods mentioned in Section \@ref(html-css).
+Below is an example:
+
+`r import_example('chunk-custom.Rmd')`
+
+The output style is shown in Figure \@ref(fig:chunk-border).
+
+```{r chunk-border, echo=FALSE, fig.cap="A code chunk with a light pink background color and a thick red border."}
+knitr::include_graphics("images/chunk-border.png", dpi = NA)
+```
+
+If you want all code chunks in the document to use the custom style, you can set `class.source` in the global **knitr** options, e.g.,
+
+```{r, eval=FALSE}
+knitr::opts_chunk$set(class.source='watch-out')
+```
+
+If you want to decorate individual elements in code blocks instead of the whole blocks, you may consider using the **flair** package: https://github.com/kbodwin/flair. With this package, you can highlight different parts of your code (such as fixed strings, function names, and arguments) with custom styles (e.g., color, font size, and/or font weight).
+
+## Scrollable code blocks {#html-scroll}
+
+When you have large amounts of code and/or verbatim text output to display on an HTML page, it may be desirable to limit their heights, otherwise the page may look overwhelmingly lengthy, which will make it difficult for those who do not want to read the details in the code or its text output to skip these parts. There are multiple ways to solve this problem. One solution is to use the `code_fold` option in the `html_document` format, which will fold code blocks in the output and readers can unfold them by clicking a button.
+
+```yaml
+output:
+  html_document:
+    code_fold: hide
+```
+
+The other possible solution is to make the code blocks scrollable within a fixed height when they are too long. This can be achieved by the CSS properties `max-height` and `overflow-y`. Below is a full example with the output in Figure \@ref(fig:html-scroll):
+
+`r import_example('html-scroll.Rmd')`
+
+```{r html-scroll, echo=FALSE, fig.cap="Scrollable code blocks using custom CSS."}
+knitr::include_graphics("images/html-scroll.png", dpi = NA)
+```
+
+In the above example, we defined a global maximum height of 300px for all code blocks. Remember that code blocks are placed in `<pre>` tags in the HTML output. Then we limited the height of `<pre>` blocks with `class` attributes to 100px. That is what the CSS selector `pre[class]` means. By default, text output will be contained in `<pre> </pre>`, and R code blocks are contained in `<pre class="r"> </pre>` (note that the `<pre>` tag has a `class` attribute here).
+
+The height of the text output from the second R code chunk is also 100px. That is because we assigned a custom class name `scroll-100` to the output, and defined the maximum height to be 100px.
+
+If you want to specify different maximum heights for individual code blocks, you may see the example in Section \@ref(hook-scroll).
+
+## Fold all code blocks but show some initially {#fold-show}
+
+If code blocks in the output document are potentially distracting to readers, you may choose to fold them initially, and readers can choose to display them by clicking the fold buttons:
+
+```yaml
+output:
+  html_document:
+    code_fold: hide
+```
+
+You can also choose to unfold all code blocks initially (so readers can choose to fold them later):
+
+```yaml
+output:
+  html_document:
+    code_fold: show
+```
+
+If you fold all code blocks initially, you can specify certain blocks to be unfolded initially with the chunk option `class.source = "fold-show"`, e.g.,
+
+`r import_example('fold-show.Rmd')`
+
+You can also do it the other way around, i.e., show all code blocks but hide some of them initially. For example:
+
+````md
+---
+output:
+  html_document:
+    code_folding: show
+---
+
+```{r}`r ''`
+1  # code is shown initially
+```
+
+```{r class.source = 'fold-hide'}`r ''`
+2  # code is hidden initially
+```
+````
+
+## Put content in tabs {#html-tabs}
+
+<!--https://stackoverflow.com/questions/38062706/rmarkdown-tabbed-and-untabbed-headings-->
+
+One natural way of organizing parallel sections in an HTML report is to use tabsets. This allows readers to view the content of different sections by clicking the tab titles instead of scrolling back and forth on the page.
+
+To turn sections into tabs, you can add a class attribute `.tabset` to the upper-level section header. Below is a full example:
+
+`r import_example('html-tabs.Rmd')`
+
+The output is shown in Figure \@ref(fig:html-tabs). Note that you can only see one tab at a time in reality. In this figure, we actually concatenated two screenshots for you to see both tabs.
+
+```{r html-tabs, echo=FALSE, fig.cap="Turn sections into tabs."}
+knitr::include_graphics("images/html-tabs.png", dpi = NA)
+```
+
+You can add another attribute `.tabset-pills` to the upper-level section header to add a "pill" effect to the tab, and the tab will have a dark blue background.
+
+```md
+## Results {.tabset .tabset-pills}
+```
+
+By default, the first tab is active (i.e., displayed). If you want a different tab to be displayed initially, you may add the attribute `.active` to it.
+
+To end the tabset, you need to start a new section header of the upper level. The new section header can be empty, e.g.,
+
+```md
+## Results {.tabset}
+
+### Tab One
+
+### Tab Two
+
+## {-}
+
+With the above unnumbered (`{-}`) and empty section header,
+we can end the tabset and continue to write more paragraphs.
+```
+
+## Embed the Rmd source file in the HTML output file {#embed-rmd}
+
+When you share an HTML output page with others, they may want the Rmd source file, too. For example, they may want to change the Rmd source and compile the report by themselves. You can use the option `code_download` to embed a copy of the Rmd source file in the HTML output file:
+
+```yaml
+output:
+  html_document:
+    code_download: true
+```
+
+After the option is turned on, the HTML output page will contain a download button, and readers of the page can hit the button to download the Rmd source file.
+
+## Embed arbitrary files in the HTML output file {#embed-file}
+
+As mentioned in Section \@ref(embed-rmd), we can embed a copy of the Rmd source document in the HTML output file. Sometimes the Rmd source file alone may not be enough to reproduce the report. For example, the report may need an external data file. There is a series of functions in the **xfun** package that enable you to embed arbitrary files in the HTML output file. To use these functions, make sure you have the following R packages available:
+
+```{r, eval=FALSE}
+xfun::pkg_load2(c('base64enc', 'htmltools', 'mime'))
+```
+
+Then you can use one of the functions `xfun::embed_file()`, `xfun::embed_dir()`, or `xfun::embed_files()` in an R code chunk to embed one or multiple files or an entire directory in the HTML output, e.g.,
+
+````md
+```{r echo=FALSE}`r ''`
+# a single file
+xfun::embed_file('source.Rmd')
+
+# multiple files
+xfun::embed_files(c('source.Rmd', 'data.csv'))
+
+# a directory
+xfun::embed_dir('data/', text = 'Download full data')
+```
+````
+
+You can also provide the list of files programmatically, e.g.,
+
+```{r eval=FALSE}
+# embed all Rmd and csv files
+xfun::embed_files(list.files('.', '[.](Rmd|csv)$'))
+```
+
+For multiple files, they are first compressed to a zip file, and the zip file will be embedded. These functions return a link, which a reader can click on the HTML page to download the embedded file.
+
+You can learn more technical details behind these functions from the help page `?xfun::embed_file` or the blog post at https://yihui.org/en/2018/07/embed-file/. Based on the same idea, the **downloadthis** package (https://github.com/fmmattioni/downloadthis) has implemented download buttons, so that users can click buttons to download files instead of links. If you prefer using buttons, you may consider using this package.
+
+## Include the content of an existing HTML file {#include-html}
+
+With the `includes` option of the `html_document` format (or any other formats that support this option), you can include the content of an existing HTML file into the HTML output document in three possible places: the `<head>` area, the beginning of `<body>`, and the end of `</body>`.
+
+```yaml
+output:
+  html_document:
+    includes:
+      in_header: header.html
+      before_body: before.html
+      after_body: after.html
+```
+
+If you are not familiar with HTML, Section \@ref(html-template) may help you better understand these options.
+
+With the `in_header` option, you can inject CSS and JavaScript code into the `<head>` tag. With `before_body`, you may include a header that shows a banner or logo. With `after_body`, you can include a footer, e.g.,
+
+```html
+<div class="footer">Copyright &copy; John Doe 2020</div>
+```
+
+Sometimes you may want to include the content of an external HTML file in an arbitrary place of the body, which can be done with `htmltools::includeHTML()`. You pass the path of the HTML file to this function. It will read the file, and write its content to the output document. You may also use the technique in Section \@ref(raw-content), e.g.,
+
+`````md
+````{=html}
+```{r, echo=FALSE, results='asis'}`r ''`
+xfun::file_string('file.html')
+```
+````
+`````
+
+Please note that you must not include the content of a full HTML file into another HTML file, but can only include an HTML fragment. A full HTML file contains the `<html>` tag, which cannot be embedded in another `<html>` tag. Below is an invalid HTML document when a full HTML document is included in another HTML document:
+
+```html
+<html>
+  <head>  </head>
+
+  <body>
+  Parent HTML file.
+  
+  <!-- htmltools::includeHTML() below -->
+    <html>
+      <head>  </head>
+      <body>
+      Child HTML file.
+      </body>
+    </html>
+  <!-- included above -->
+
+  </body>
+</html>
+```
+
+If you run into problems when including an HTML file in an HTML output document, you may check if the HTML file contains the `<html>` tag.
+
+There is an output format `html_fragment` in the **rmarkdown** package, which generates an HTML fragment instead of a full HTML document. If you want to include the compiled results of an Rmd document in another Rmd document, the former Rmd document may use the `html_fragment` format instead of the usual `html_document`.
+
+If you want to include an Rmd or Markdown document instead of an HTML file, you may use child documents introduced in Section \@ref(child-document).
+
+## Use the `<details>` disclosure element {#details-tag}
+
+As mentioned in Section \@ref(html-scroll), we can fold source code chunks via the option `code_fold: true` in the `html_document` format. Currently it is not possible to fold output blocks, but we can use some JavaScript tricks to make output foldable, too. This can be useful especially when the output is relatively long but not very important, so we fold it initially. If the reader is interested, they can unfold it to view the content. Figure \@ref(fig:details-tag) shows an example: you may click on the "Details" button to unfold the output.
+
+```{r, details-tag, echo=FALSE, fig.show='hold', fig.cap='Wrap text output in the details element.', out.width=if(knitr::is_latex_output()) '100%'}
+knitr::include_graphics(c('images/details-closed.png', 'images/details-open.png'), dpi = NA)
+```
+
+If you are viewing the HTML version of this book, you can actually see it in action below. If you are reading the PDF or printed version, such an interaction (clicking the "Details" button) is certainly not possible.
+
+```{r}
+1:100
+```
+
+Below is the full source Rmd document that includes the JavaScript code to find output blocks, and wrap them into the `<details>` tags.
+
+```{js, echo=FALSE, include=knitr::is_html_output()}
+(function() {
+  var codes = document.querySelectorAll('pre:not([class])');
+  var code, i, d, s, p;
+  for (i = 0; i < codes.length; i++) {
+    code = codes[i];
+    p = code.parentNode;
+    d = document.createElement('details');
+    s = document.createElement('summary');
+    s.innerText = 'Details';
+    // <details><summary>Details</summary></details>
+    d.appendChild(s);
+    // move the code into <details>
+    p.replaceChild(d, code);
+    d.appendChild(code);
+  }
+})();
+```
+
+`r import_example('details-tag.Rmd')`
+
+You may try to adapt the JavaScript code above to your own need. The key is to find out the elements to be wrapped into `<details>`:
+
+```js
+document.querySelectorAll('pre:not([class])');
+```
+
+The CSS selector `pre:not([class])` means all `<pre>` elements without the `class` attribute. You can also select other types of elements. For more about CSS selectors, see https://www.w3schools.com/css/css_selectors.asp. For more about the HTML tags `<details>` and `<summary>`, see https://www.w3schools.com/tags/tag_details.asp.
+
+## For hardcore HTML users {#html-hardcore}
+
+In Section \@ref(latex-hardcore), we mentioned that if you feel the constraint of Markdown (due to its simplicity) is too strong, you can embed code chunks in a pure LaTeX document instead of Markdown. Similarly, if you are familiar and comfortable with writing raw HTML code, you can intermingle code chunks with HTML, too. Such documents have the conventional filename extension `.Rhtml`.
+
+In an `Rhtml` document, code chunks are embedded between `<!--begin.rcode` and `end.rcode-->`, and inline R expressions are embedded in `<!--rinline -->`. Below is a full `Rhtml` example. You can save it to a file named `test.Rhtml`, and use `knitr::knit("test.Rhtml")` to compile it. The output will be an HTML (`.html`) file. In RStudio, you can also hit the `Knit` button on the toolbar to compile the document.
+
+`r import_example('knitr.Rhtml')`

@@ -1,0 +1,162 @@
+# Chunk Hooks {#chunk-hooks}
+
+A chunk hook is a function that is triggered by a chunk option when the value of this chunk option is not `NULL`. Chunk hooks provide a way for you to execute additional tasks beyond running the code in a chunk.
+
+You can use chunk hooks purely for their side-effects (e.g., only printing out certain information to the console), or for their returned values, which will be written to the output document if the value is a character value.
+
+Like output hooks (see Chapter \@ref(output-hooks)), chunk hooks are also registered via the object `knitr::knit_hooks`. Please note that the names of output hooks are reserved by **knitr**, so you must not use these names for your custom chunk hooks:
+
+```{r}
+names(knitr:::.default.hooks)
+```
+
+A chunk hook is associated with a chunk option of the same name. For example, you can register a chunk hook with the name `greet`:
+
+```{r}
+knitr::knit_hooks$set(greet = function(before) {
+  if (before) "Hello!" else "Bye!"
+})
+```
+
+We will explain the arguments of the hook function in a moment. Now we set the chunk option `greet = TRUE` for the chunk below: 
+
+````md
+```{r, greet=TRUE}`r ''`
+1 + 1
+```
+````
+
+And you will see that "Hello!" appears before the chunk, and "Bye!" appears after the chunk in the output below (which is because they are character values):
+
+::: {.infobox .tip data-latex="{tip}"}
+```{r, greet=TRUE}
+1 + 1
+```
+:::
+
+A chunk hook function can possibly take four arguments: `before`, `options`, `envir`, and `name`. In other words, it can be of this form:
+
+```r
+function(before, options, envir, name) {
+
+}
+```
+
+All four arguments are optional. You can have four, three, two, one, or even no arguments. In the above example, we used one argument (i.e., `before`). The meanings of these arguments are:
+
+- `before`: Whether the chunk hook is executed before or after the code chunk itself is executed. Note that a chunk hook is executed twice for every code chunk (once before with `hook(before = TRUE)` and once after with `hook(before = FALSE`).
+
+- `options`: The list of chunk options for the current code chunk, e.g., `list(fig.width = 5, echo = FALSE, ...)`.
+
+- `envir`: The environment in which the chunk hook is evaluated.
+
+- `name`: The name of the chunk option that triggered the chunk hook.
+
+As we mentioned in the beginning of this chapter, non-character values returned by chunk hooks are silently ignored, and character values are written to the output document.
+
+## Crop plots {#crop-plot}
+
+The chunk hook `knitr::hook_pdfcrop()` can be used to crop PDF and other types of plot files, i.e., remove the extra margins in plots. To enable it, set this hook via `knit_hooks$set()` in a code chunk, and turn on the corresponding chunk option, e.g.,
+
+```{r}
+knitr::knit_hooks$set(crop = knitr::hook_pdfcrop)
+```
+
+Then you can use the chunk option `crop = TRUE` to crop plots in a code chunk.
+
+The hook `hook_pdfcrop()` calls the external program `pdfcrop` to crop PDF files. This program often comes with a LaTeX distribution (e.g., TeX Live or MiKTeX). You can check if it is available in your system via:
+
+```{r}
+# if the returned value is not empty, it is available
+Sys.which('pdfcrop')
+```
+
+If you are using the LaTeX distribution TinyTeX (see Section \@ref(install-latex)), and `pdfcrop` is not available in your system, you may install it via `tinytex::tlmgr_install('pdfcrop')`.
+
+For non-PDF plot files such as PNG or JPEG files, this hook function calls the R package **magick** to crop them. You need to make sure this R package has been installed. Figure \@ref(fig:crop-no) shows a plot that is not cropped, and Figure \@ref(fig:crop-yes) shows the same plot but has been cropped.
+
+```{r, crop-no, crop=NULL, echo=FALSE, fig.cap='A plot that is not cropped.'}
+par(bg = 'gray', fg = 'yellow')
+plot(cars)
+```
+
+```{r, crop-yes, crop=TRUE, echo=FALSE, fig.cap='A plot that is cropped.', ref.label='crop-no'}
+```
+
+## Optimize PNG plots {#optipng}
+
+If you have installed the program OptiPNG (http://optipng.sourceforge.net), you may use the hook `knitr::hook_optipng()` to optimize PNG plot files to a smaller size without losing the image quality.
+
+```{r, eval=FALSE}
+knitr::knit_hooks$set(optipng = knitr::hook_optipng)
+```
+
+After you set up this hook, you can use the chunk option `optipng` to pass command-line arguments to OptiPNG, e.g., `optipng = '-o7'`. These command-line arguments are optional, which means you can just use `optipng = ''` to enable the hook for a code chunk. Please see the user manual on the website of OptiPNG to know the possible arguments.
+
+Note that macOS users can easily install OptiPNG with Homebrew (https://brew.sh): `brew install optipng`.
+
+## Report how much time each chunk takes to run {#time-chunk}
+
+By default, **knitr** provides a text-based progress bar to show you the knitting progress. If you want more precise timing information about the chunks, you may register a custom chunk hook to record the time for each chunk. Here is an example hook:
+
+```{r, eval=FALSE}
+knitr::knit_hooks$set(time_it = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      # record the current time before each chunk
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now)
+      # return a character string to show the time
+      paste('Time for this code chunk to run:', res)
+    }
+  }})
+)
+```
+
+Then you can time a chunk with the chunk option `time_it`, e.g.,
+
+````
+```{r, time_it = TRUE}`r ''`
+Sys.sleep(2)
+```
+````
+
+If you want to time all code chunks, you can certainly set the option globally: `knitr::opts_chunk$set(time_it = TRUE)`.
+
+In the above hook function, you can also output more information from the chunk options (i.e., the `options` argument of the function). For example, you may print out the chunk label in the returned value:
+
+```{r, eval=FALSE}
+paste('Time for the chunk', options$label, 'to run:', res)
+```
+
+Or you may record the time without printing it out in the hook:
+
+```{r, eval=FALSE}
+all_times <- list()  # store the time for each chunk
+knitr::knit_hooks$set(time_it = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      res <- difftime(Sys.time(), now)
+      all_times[[options$label]] <<- res
+    }
+  }})
+)
+```
+
+Then you can access all the time information in the object `all_times`, which is a named list with the names being chunk labels, and element values being the execution time for each chunk.
+
+## Show the chunk header in the output {#show-header}
+
+Sometimes you may want to show the original code chunk header to your readers. For example, when you write an R Markdown tutorial, you may want to show both the chunk output and the chunk options that you used to generate the output, so your readers can learn how to do it by themselves.
+
+The original chunk options are actually stored as a character string in the chunk option `params.src`. After you know this, you may write a chunk hook to add `params.src` to the output. Below is a full example:
+
+`r import_example('chunk-wrapper.Rmd')`
+
+Basically, we restored the chunk header from `options$params.src` by putting this string inside ```` ```{r, }````. Then we wrapped this line in a pair of four backticks, so it can be displayed verbatim in the output. Note that the original code chunk might be indented (e.g., when it is nested in a list item), so we also need to add the proper indentation, which is stored in the chunk option `options$indent`.

@@ -1,0 +1,151 @@
+--- 
+title: "R Markdown Cookbook"
+author: "Yihui Xie and Christophe Dervieux"
+date: "`r Sys.Date()`"
+bibliography:
+  - packages.bib
+biblio-style: apalike
+description: Examples, tips, and tricks of using R Markdown.
+documentclass: krantz
+link-citations: yes
+colorlinks: yes
+graphics: yes
+lot: yes
+lof: yes
+fontsize: 11pt
+mainfont: Palatino
+monofont: "Source Code Pro"
+monofontoptions: "Scale=0.8"
+site: bookdown::bookdown_site
+github-repo: yihui/rmarkdown-cookbook
+---
+
+```{r setup, include=FALSE}
+set.seed(0728)
+
+knitr::opts_chunk$set(tidy = TRUE)
+
+if (knitr::is_html_output()) {
+  # ignore percentage widths for HTML output, unless they are used for multiple
+  # figures side by side
+  knitr::opts_hooks$set(out.width = function(options) {
+    if (options$fig.show != 'hold' && grepl('%$', options$out.width))
+      options$out.width = NULL
+    options
+  })
+}
+
+# packages only available on Github
+remote_pkgs = c(equatiomatic = 'datalorax')
+
+lapply(c(
+  'remotes', 'webshot', 'DiagrammeR', 'stargazer', 'gt', 'flextable', 'formatR',
+  'equatiomatic', 'gifski', 'magick', 'pdftools', 'tikzDevice', 'xaringan',
+  'kableExtra', 'blogdown', 'jsonlite'
+  ), function(pkg) {
+    if (system.file(package = pkg) != '') return()
+    repo = remote_pkgs[pkg]
+    if (is.na(repo)) install.packages(pkg) else {
+      remotes::install_github(paste(repo, pkg, sep = '/'))
+    }
+  }
+)
+
+import_example <- function(file, lang = xfun::file_ext(file)) {
+  x = xfun::read_utf8(file.path("examples", file))
+  lang = tolower(lang)
+  if (nchar(lang) > 1) {
+    lang = sub('^r', '', lang)
+    if (lang == 'nw') lang = 'tex'
+  }
+  knitr::asis_output(paste(c(sprintf("````%s", lang), x, "````"), collapse = '\n'))
+}
+
+options(bookdown.post.latex = function(x) {
+  # only build a skeleton for the online version
+  if (Sys.getenv('BOOKDOWN_FULL_PDF', '') == 'false') return(bookdown:::strip_latex_body(
+    x, '\nThis PDF is only a skeleton. Please either read the free online HTML version, or purchase a hard-copy of this book.\n'
+    ))
+
+  # fix syntax highlighting:
+  # \FunctionTok{tufte:}\AttributeTok{:tufte_html: default} ->
+  # \FunctionTok{tufte::tufte_html:}\AttributeTok{ default}
+  x = gsub('(\\\\FunctionTok\\{[^:]+:)(})(\\\\AttributeTok\\{)(:[^:]+:)', '\\1\\4\\2\\3', x)
+  if (length(i <- grep('^\\\\begin\\{longtable\\}', x)) == 0) return(x)
+  i1 = bookdown:::next_nearest(i, which(x == '\\toprule'))
+  i2 = bookdown:::next_nearest(i, which(x == '\\endfirsthead'))
+  x[i1 - 1] = paste0(x[i1 - 1], '\n\\begin{tabular}{', gsub('[^lcr]', '', gsub('.*\\[]', '', x[i])), '}')
+  x[i] = '\\begin{table}'
+  x[x == '\\end{longtable}'] = '\\end{tabular}\n\\end{table}'
+  x[x == '\\endhead'] = ''
+  x = x[-unlist(mapply(seq, i1, i2, SIMPLIFY = FALSE))]
+  x
+})
+```
+
+# Preface {-}
+
+::: {.infobox .caution data-latex="{caution}"}
+This book is in an early stage of development. If you have any suggestions on what should be included within this book, please feel free to [file an issue on GitHub](https://github.com/yihui/rmarkdown-cookbook/issues/new). Thank you!
+:::
+
+R Markdown is a powerful tool for combining analysis and reporting into the same document. Since the birth of the **rmarkdown** package [@R-rmarkdown] in early 2014, R Markdown has grown substantially from a package that supports a few output formats, to an extensive and diverse ecosystem that supports the creation of books, blogs, scientific articles, websites, and even resumes.
+
+There is a wealth of guidance that has been written over the past few years, and the book [*R Markdown: The Definitive Guide*](https://bookdown.org/yihui/rmarkdown/) [@rmarkdown2018] provides a detailed reference on the built-in R Markdown output formats of the **rmarkdown** package, as well as several other extension packages. However, we have received comments from our readers and publisher that it would be beneficial to provide more practical and relatively short examples to show the interesting and useful usage of R Markdown, because it can be daunting to find out how to achieve a certain task from the aforementioned reference book (put it another way, that book is too dry to read). As a result, this cookbook was born.
+
+Despite of the existence of the official documentation, R Markdown users often seek for help on Stack Overflow, a popular Q&A forum. At the time of writing, there are more than 6,000 questions with [the `r-markdown` tag.](https://stackoverflow.com/questions/tagged/r-markdown) This huge number means that the use of the forum can be difficult if you do not have a specific problem to search for. Therefore, it may be hard for you to realize all possible things that you could do with R Markdown or how to do them. This book aims to draw together popular posts from Stack Overflow and other online resources (such as blog posts or tutorials) to provide up-to-date solutions for everyday queries that users commonly make. In fact, to help us make decisions on the potential topics to cover in this book, the second author of this book, Christophe, has built an R Markdown dashboard to scrape Stack Overflow daily for the most popular posts. Hopefully, our cookbook can become more useful by including recipes from these popular posts.
+
+This book is designed to provide a range of examples of how to extend the functionality of your R Markdown documents. As a cookbook, this guide is recommended to new or intermediate R Markdown users who desire to enhance the efficiency of using R Markdown and also explore the power of R Markdown.
+
+## How to read this book {-}
+
+It is recommended that readers have a basic understanding of R Markdown. [Chapter 2](https://bookdown.org/yihui/rmarkdown/basics.html) of [*R Markdown: The Definitive Guide*](https://bookdown.org/yihui/rmarkdown/) [@rmarkdown2018] provides an overview of the basics of R Markdown and is recommended background reading for any new users of R Markdown. For example, we did not cover Markdown syntax in this book, and expect readers to learn Markdown elsewhere. In particular, we strongly recommend that you go through [the full manual of Pandoc](https://pandoc.org/MANUAL.html) at least once. The manual is quite lengthy, but it is also a gold mine. You do not have to remember everything, but it will be very helpful if you are aware of the possible features of Markdown. [For countless times, I have seen](https://yihui.org/en/2018/11/hard-markdown/) people fail to write verbatim code blocks that contain three backticks, or list items that contain child elements. Without fully reading the Markdown syntax in the manual, perhaps you will never know or understand the rule "`N + 1` outer backticks for `N` inner backticks" or "indent to indicate child elements."
+
+We do not intend to provide a full technical reference for R Markdown in this cookbook. This cookbook aims to supplement, instead of replacing, the existing literature. Therefore readers may explore the following books if they want to seek further information:
+
+- *R Markdown: The Definitive guide* [@rmarkdown2018], the technical reference for all R Markdown output formats in the **rmarkdown** package and several other extension packages.
+
+- *Dynamic Documents with R and knitr* [@knitr2015] provides a thorough introduction to the **knitr** package [@R-knitr] (note that R Markdown is only one of the document formats that **knitr** supports).
+
+- *bookdown: Authoring Books and Technical Documents with R Markdown* [@bookdown2016]: a short book as the official documentation of the **bookdown** package [@R-bookdown], which is designed to simplify the creation of long-format documents in R Markdown.
+
+- *blogdown: Creating Websites with R Markdown* [@blogdown2017] introduces how to create websites in R Markdown with the **blogdown** package [@R-blogdown] package.
+
+Where relevant, this book provides references to these existing resources. By the way, the R Markdown website also contains a lot of resources that you may find helpful: https://rmarkdown.rstudio.com.
+
+You do not need to read this book in a particular order. Later chapters are not necessarily more challenging than previous chapters. It may be most efficient to read this book when you have some specific tasks in mind that you want to do with R Markdown, otherwise you can thumb through the table of contents and see if you are interested in any particular parts. We have tried to make each section and example as self-contained as possible, so you do not have to go back and forth among different parts of this book. In some cases, cross-referencing is unavoidable, and we will refer you to the background knowledge required to understand a certain example.
+
+If you want to try the examples by yourself, the full source code of this book and examples are freely provided on GitHub at https://github.com/yihui/rmarkdown-cookbook. If you are reading the electronical version of this book, you may also just copy and paste the examples from the pages and run them in your favorite editor.
+
+## Structure of the book {-}
+
+The book is broken down into small "recipes" that aim to demonstrate a single concept at a time. Chapter \@ref(installation) provides instructions on how to install the necessary software tools. Chapter \@ref(basics) gives an overview of how R Markdown works, and how to convert between R Markdown documents and R scripts. Chapter \@ref(document-elements) tells you how to generate certain document elements, such as page breaks, bibliographies, numbered figures, animations, and diagrams, etc. Chapter \@ref(formatting) shows how to format the content, such as adjusting the figure size and alignment. Chapter \@ref(latex-output) introduces tips and tricks to those who only want LaTeX/PDF output. Similarly, Chapter \@ref(html-output) is for HTML users, and Chapter \@ref(word) is for Word users. If you want to produce output documents of multiple output formats (which is often tricky), you may find Chapter \@ref(multi-formats) useful. Chapter \@ref(chunk-options) shows some applications of **knitr**'s chunk options that you may not know. Chapter \@ref(output-hooks) and Chapter \@ref(chunk-hooks) are a little advanced, but should also be very useful because they show you the great power of being able to control **knitr**'s output and behavior with custom hook functions. Chapter \@ref(knitr-misc) introduces a variety of **knitr** tricks. Chapter \@ref(tables) is, to be honest, my least favorite chapter, but I know a lot of users really want to learn how to produce tables. I'm not an expert on fancy tables, but hope you will at least find the list of packages there helpful. Chapter \@ref(other-languages) shows examples of using other languages in R Markdown, so you know R Markdown is not only for R. It also teaches you how to make **knitr** work with a new language that has not been supported yet. Chapter \@ref(managing-projects) introduces tips on managing projects related to R Markdown. Chapter \@ref(workflow) presents some tips on enhancing your workflow.
+
+The recipes in this book are usually independent to each other, so you can pick up any one to read if you do not have a specific goal in mind.
+
+## Software information and conventions {#software-info .unnumbered}
+
+The R session information used when compiling this book is as follows:
+
+```{r tidy=FALSE}
+xfun::session_info(c(
+  'bookdown', 'knitr', 'rmarkdown', 'xfun'
+), dependencies = FALSE)
+```
+
+We do not add prompts (`>` and `+`) to R source code in this book, and we comment out the text output with two hashes `##` by default, as you can see from the R session information above. This is for your convenience when you want to copy and run the code (the text output will be ignored since it is commented out). Package names are in bold text (e.g., **rmarkdown**), and inline code and filenames are formatted in a typewriter font (e.g., `knitr::knit('foo.Rmd')`). Function names are followed by parentheses (e.g., `blogdown::serve_site()`). The double-colon operator `::` means accessing an object from a package.
+
+"Rmd" is the filename extension of R Markdown files, and also an abbreviation of R Markdown in this book.
+
+## Acknowledgements {-}
+
+As usual, first I want to thank my employer RStudio for giving me the freedom to work on this book. Since I started working on it, my weekly meeting time with my manager, Tareef Kawaf, was first reduced from 15 minutes to 5 minutes, and then the meetings were just canceled. I have heard from several friends that they have too many unbearable meetings in their institutions, which waste a lot of their time. In terms of managing distractions, one of them recently lamented, "You may be able to mute Slack for five minutes, but can you possibly mute it for _a whole day_?" "Of course, I can!" I told her. I can probably mute it for a whole month if I like. Do not get me wrong---I do not mean Tareef or my colleagues are distractions. I only mean how much freedom they can offer me.
+
+I came up with the idea of writing this cookbook after I published the *R Markdown Definitive Guide*, but ideas are often cheap. It is the execution that is hard and expensive. If it were not for [Michael Harper's](http://mikeyharper.uk) initial pushing, I would never start working on it seriously. Christophe Dervieux has always been around whenever I need help. He used his R and R Markdown skills to build a dashboard (with the **flexdashboard** package) to guide me to the potentially interesting and useful topics to write on. Meanwhile, he has also helped me in numerous other GitHub issues, so I could have more time for writing the book, instead of spending whole days on wrestling with bug reports that did not have minimal reproducible examples attached. Similarly, several people have been helping with answering R Markdown questions on Stack Overflow, including Martin Schmelzer, Marcel Schilling, and Ralf Stubner, etc. Perhaps their intention is not to save me time, but their effort did save me a lot of time. Recently Johannes Friedrich also came to my attention on Stack Overflow, after a few times when I opened a new Stack Overflow question only to find it already answered by him.
+
+David Keyes saved my life in Section \@ref(table-other), since he had written [a wonder blog post](https://rfortherestofus.com/2019/11/how-to-make-beautiful-tables-in-r/) to introduce several R packages to create tables, with which I was not very familiar. 
+
+```{block2, type='flushright', html.tag='p'}
+Yihui Xie  
+Elkhorn, Nebraska
+```

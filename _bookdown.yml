@@ -1,0 +1,12 @@
+book_filename: "rmarkdown-cookbook"
+repo: https://github.com/yihui/rmarkdown-cookbook
+delete_merged_file: true
+clean: [packages.bib]
+language:
+  label:
+    fig: "FIGURE "
+    tab: "TABLE "
+  ui:
+    chapter_name: "Chapter "
+edit: "https://github.com/yihui/rmarkdown-cookbook/edit/master/%s"
+
