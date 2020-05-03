@@ -3,7 +3,7 @@ title: "Dashboard for SO questions in Rmarkdown Cookbook"
 output: 
   flexdashboard::flex_dashboard:
     self_contained: false
-    orientation: rows 
+    orientation: rows
 ---
 
 ```{r setup, include=FALSE}
@@ -86,6 +86,7 @@ if (!is_dev){
   ignored_issues <- c(4)
   issues <- get_issue_labels_state(owner, repo)
   get_all_thread <- map_dfr(issues$number, ~ get_issue_thread(owner, repo, .x))
+  saveRDS(get_all_thread, "get_all_threads.Rds")
   so_in_gh <- get_all_thread %>%
     # do not select some issue
     filter(!issue %in% ignored_issues) %>%
@@ -408,3 +409,158 @@ data_table(knit_example_in_gh %>%
 )
 ```
 
+Thank you
+============================
+
+```{r, include = FALSE}
+get_user_name <- function(user) {
+  # setup token
+  token <- Sys.getenv("GITHUB_GRAPHQL_TOKEN", 
+                      Sys.getenv("GITHUB_PAT", NA_character_))
+  if (is.na(token)) stop("Setup a token for the GraphQL API in env vars")
+  # connect to API V4
+  con <- ghql::GraphqlClient$new(
+    url = "https://api.github.com/graphql",
+    headers = list(Authorization = paste0("Bearer ", token))
+  )
+  # con$load_schema()
+  # query to get username
+  qry <- ghql::Query$new()
+  qry$query("username", 
+            'query username($user: String!){
+            user(login: $user) {
+            name
+            }
+            }')
+  res <- con$exec(qry$queries$username, variables = list(user = user))
+  # parse result
+  name <- jsonlite::fromJSON(
+    jqr::jq(res, ".data.user.name")
+  )
+  if (is.null(name)) return("")
+  name
+}
+get_user_name_mem <- memoise::memoise(get_user_name)
+```
+
+
+```{r}
+get_all_thread <- readRDS("get_all_threads.Rds")
+other_authors <- get_all_thread %>%
+  # we keep only infos that are useful for author analysis
+  select(author, title, issue, comment_url) %>%
+  # we want other authors than us
+  filter(!author %in% c("yihui", "cderv")) %>%
+  # we identify comment contribution from issue creation
+  mutate(
+    comment = grepl("#issuecomment", comment_url),
+    issue_url = gsub("#issuecomment.*$", "", comment_url),
+    comment_url = NULL
+    ) %>%
+  # we keep only one entry by issue
+  group_by(author, title, issue, issue_url) %>%
+  group_modify(~ {
+    .x %>% arrange(comment) %>% slice(1) %>% select(comment_only = comment)
+  }) %>%
+  ungroup() %>%
+  mutate(author_name = purrr::map_chr(author, get_user_name_mem)) %>%
+  # manually fill empty name I know
+  mutate(author_name = case_when(
+    author == "atusy" ~ "Atsushi Yasumoto",
+    TRUE ~ author_name
+  )) %>%
+  select(author_name, everything()) 
+saveRDS(other_authors, "other_authors.Rds")
+```
+
+Row {.tabset}
+-------------------------------------------
+
+```{r}
+make_link <- function(issue, issue_url) {
+  map2(issue, issue_url, ~ {
+    htmltools::a(.x, href = .y, target="_blank")
+  })
+}
+```
+
+### Thank you for opening issues
+
+Thank you to the user who suggested some ideas by opening an issue in the rmarkdown-cookbook repository
+
+```{r, results='asis'}
+other_authors %>%
+  filter(!comment_only) %>%
+  select(-comment_only) %>%
+  group_by(author, author_name) %>%
+  tidyr::nest() %>%
+  purrr::pmap(function(author, author_name, data) {
+      htmltools::tags$li(
+        author_name, " (",
+        make_link(
+          glue::glue("@{author}"),
+          glue::glue("https://github.com/{author}")
+        ),"): ",
+        make_link(paste0("#", data$issue), data$issue_url)
+      )
+  }) %>%
+  htmltools::tags$ul()
+```
+
+### Thank you for participating in issues threads
+
+Thank you to the user who share their feedback by commenting on threads in the rmarkdown-cookbook repository
+
+```{r, results='asis'}
+other_authors %>%
+  filter(comment_only) %>%
+  select(-comment_only) %>%
+  group_by(author, author_name) %>%
+  tidyr::nest() %>%
+  purrr::pmap(function(author, author_name, data) {
+      htmltools::tags$li(
+        author_name, " (",
+        make_link(
+          glue::glue("@{author}"),
+          glue::glue("https://github.com/{author}")
+        ),"): ",
+        make_link(paste0("#", data$issue), data$issue_url)
+      )
+  }) %>%
+  htmltools::tags$ul()
+```
+
+### Download Data
+
+The data about issue's author has been found using the GitHub V4 API. For each issue, we can get information about each comments, and its author. The data has been simplified
+
+* One observation per author, per issue he contributed
+* `comment_only` is `TRUE` if the user only commented in the thread and not created the issue. It is `FALSE` if the user is the author of the issue.
+* `author_name` has been filled using GitHub author profile. Some author name are empty because not found in the GH account and not know by us yet... 
+
+```{r}
+glimpse(other_authors)
+```
+
+You can download this data in RDS if necessary
+
+```{r}
+xfun::embed_file("other_authors.Rds", text = "Download data as RDS")
+```
+
+</br>
+or view it and download as CSV is next tab.
+
+### See the Data 
+
+```{r}
+ DT::datatable(other_authors,
+                escape = FALSE, 
+                filter = "top",
+               extensions = 'Buttons', 
+               options = list(
+                 dom = 'Bfrtip',
+                 buttons = c('copy', 'csv')
+               )
+ )
+```
